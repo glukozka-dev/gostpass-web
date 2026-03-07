@@ -1,38 +1,40 @@
 use serde::{Deserialize, Serialize};
+use sqlx::{FromRow};
+
 #[derive(Serialize,Deserialize )]
 pub struct User{
     pub login: String,
     pub password: String,
-    pub team_id: u64,
+    pub team_id: i64,
     pub pubkey: String,
     pub privkey: String,
     pub team_master_key: String,
 }
 
 #[derive(Serialize,Deserialize )]
-pub struct Table_user{
-    pub id: u64,
+pub struct TableUsers{
+    pub id: i64,
     pub login: String,
     pub password: String,
-    pub team_id: u64,
+    pub team_id: i64,
     pub pubkey: String,
     pub privkey: String,
     pub team_master_key: String,
 }
 
 #[derive(Serialize,Deserialize )]
-pub struct Table_team{
-    pub id: u64,
+pub struct TableTeams{
+    pub id: i64,
     pub name: String,
     pub masterkey: String,
 }
 
-#[derive(Serialize,Deserialize )]
+#[derive(Serialize,Deserialize,FromRow)]
 
-pub struct Table_blob{
-    pub id: u64,
+pub struct TableBlobs{
+    pub id: i64,
     pub secret_type: String,
-    pub id_owner: u64,
+    pub id_owner: i64,
     pub blob: String,
 }
 

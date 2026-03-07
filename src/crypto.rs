@@ -1,10 +1,10 @@
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use rsa::pkcs8::{EncodePrivateKey, EncodePublicKey, LineEnding};
-
+use anyhow::Result;
 const  RSA_KEY_BITS:usize = 4096;
 const TOKEN: &str = "1234";
 
-pub fn create_user_keys() -> Result<[String; 2], Box<dyn std::error::Error>> {
+pub  fn create_user_keys() -> Result<[String; 2]> {
     let mut rng = rand::thread_rng();
     let priv_key = RsaPrivateKey::new(&mut rng, RSA_KEY_BITS)?;
     let pub_key = RsaPublicKey::from(&priv_key);
