@@ -458,7 +458,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "libgost-rs",
  "rand",
  "rsa",
  "serde",
@@ -749,14 +748,6 @@ name = "libc"
 version = "0.2.182"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
-
-[[package]]
-name = "libgost-rs"
-version = "0.1.0"
-source = "git+https://github.com/glukozka-dev/libgost-rs.git#126142eeddbd151d3f06dd61dca4c97ee0eb1500"
-dependencies = [
- "streebog",
-]
 
 [[package]]
 name = "libm"
@@ -1552,15 +1543,6 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
-
-[[package]]
-name = "streebog"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e7fe6ed8a42cec360e070309427bb7959e102849b0dbaa7de19d5b9860bd536"
-dependencies = [
- "digest",
-]
 
 [[package]]
 name = "stringprep"

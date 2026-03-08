@@ -12,6 +12,7 @@ pub async fn init_db(pool: &SqlitePool) -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             login TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
+            acc_type TEXT NOT NULL,
             privkey TEXT NOT NULL,
             pubkey TEXT NOT NULL,
             team_id INTEGER NOT NULL DEFAULT 0,
@@ -23,12 +24,27 @@ pub async fn init_db(pool: &SqlitePool) -> Result<()> {
     .await?;
     println!("Table users created");
 
+    let admin = User {
+        login: "Administrator".to_string(),
+        password: "1234".to_string(),
+        acc_type: "Administrator".to_string(),
+        team_id: 0,
+        pubkey: "None".to_string(),
+        privkey: "None".to_string(),
+        team_master_key: "None".to_string(),
+    };
+
+    create_user(admin, pool).await?;
+    let admin_id = get_user_id(&"Administrator".to_string(), pool).await?;
+
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS teams (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id INTEGER NOT NULL,
             name TEXT NOT NULL UNIQUE,
-            masterkey TEXT NOT NULL
+            masterkey TEXT NOT NULL,
+            FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
         )
         "#
     )
@@ -41,7 +57,7 @@ pub async fn init_db(pool: &SqlitePool) -> Result<()> {
         CREATE TABLE IF NOT EXISTS blobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             secret_type TEXT NOT NULL,
-            id_owner INTEGER NOT NULL,
+            owner_id INTEGER NOT NULL,
             blob TEXT NOT NULL
         )
         "#
@@ -51,9 +67,10 @@ pub async fn init_db(pool: &SqlitePool) -> Result<()> {
 
     sqlx::query(
         r#"
-        INSERT INTO teams (name, masterkey) VALUES (?,?)
+        INSERT INTO teams (owner_id, name, masterkey) VALUES (?,?,?)
         "#
     )
+    .bind(admin_id)
     .bind("NOTEAM")
     .bind("None")
     .execute(pool)
@@ -68,10 +85,11 @@ pub async fn init_db(pool: &SqlitePool) -> Result<()> {
 
 pub async fn create_user(user: User, pool: &SqlitePool) -> Result<()> {
     sqlx::query(
-        "INSERT INTO users (login, password, privkey, pubkey, team_id, team_master_key) VALUES (?, ?, ?, ?, ?, ?)"
+        "INSERT INTO users (login, password, acc_type, privkey, pubkey, team_id, team_master_key) VALUES (?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(user.login)
     .bind(user.password)
+    .bind(user.acc_type)
     .bind(user.privkey)
     .bind(user.pubkey)
     .bind(user.team_id)
@@ -93,7 +111,7 @@ pub async fn delete_user(login: String, pool: &SqlitePool) -> Result<()>  {
     .await?;
 
     sqlx::query(
-        "DELETE FROM blobs WHERE id_owner = ? AND secret_type = ?"
+        "DELETE FROM blobs WHERE owner_id = ? AND secret_type = ?"
     )
     .bind(user_id)
     .bind(PERSONAL_TYPE)
@@ -103,14 +121,17 @@ pub async fn delete_user(login: String, pool: &SqlitePool) -> Result<()>  {
     Ok(())
 }
 
-pub async fn create_team(team_name: String, master_key: String, pool: &SqlitePool) -> Result<()>  {
+pub async fn create_team(team_name: String, master_key: String, owner: String, pool: &SqlitePool) -> Result<()>  {
+    let user_id: i32 = get_user_id(&owner, pool).await?;
     sqlx::query(
-        "INSERT INTO teams (name, masterkey) VALUES (?, ?)"
+        "INSERT INTO teams (owner_id, name, masterkey) VALUES (?, ?, ?)"
     )
-    .bind(team_name)
-    .bind(master_key)
+    .bind(user_id)
+    .bind(&team_name)
+    .bind(&master_key)
     .execute(pool)
     .await?;
+    add_to_team(team_name, master_key, owner, pool).await?;
     Ok(())
 }
 
@@ -124,7 +145,7 @@ pub async fn delete_team(team_name: String, pool: &SqlitePool) -> Result<()>  {
     .await?;
 
     sqlx::query(
-        "DELETE FROM blobs WHERE id_owner = ? AND secret_type = ?"
+        "DELETE FROM blobs WHERE owner_id = ? AND secret_type = ?"
     )
     .bind(team_id)
     .bind(TEAM_TYPE)
@@ -142,7 +163,7 @@ pub async fn create_personal_secret(login: String, secret: String, pool: &Sqlite
     let user_id: i32 = get_user_id(&login, pool).await?;
 
     sqlx::query(
-        "INSERT INTO blobs (secret_type, id_owner, blob) VALUES (?,?,?)"
+        "INSERT INTO blobs (secret_type, owner_id, blob) VALUES (?,?,?)"
     )
     .bind(PERSONAL_TYPE)
     .bind(user_id)
@@ -155,9 +176,8 @@ pub async fn create_personal_secret(login: String, secret: String, pool: &Sqlite
 
 pub async fn create_team_secret(team_name: String, secret: String, pool: &SqlitePool) -> Result<()>  {
     let team_id: i32 = get_team_id(&team_name, pool).await?;
-
     sqlx::query(
-        "INSERT INTO blobs (secret_type, id_owner, blob) VALUES (?,?,?)"
+        "INSERT INTO blobs (secret_type, owner_id, blob) VALUES (?,?,?)"
     )
     .bind(TEAM_TYPE)
     .bind(team_id)
@@ -207,7 +227,7 @@ pub async fn delete_from_team(login: String, pool: &SqlitePool) -> Result<()>  {
 pub async fn get_personal_secrets(login: String, pool: &SqlitePool) -> Result<Vec<TableBlobs>>  {
     let user_id: i32 = get_user_id(&login, pool).await?;
     let all_secrets: Vec<TableBlobs> = sqlx::query_as::<_, TableBlobs>(
-        "SELECT * FROM blobs WHERE id_owner = ? AND secret_type = ?"
+        "SELECT * FROM blobs WHERE owner_id = ? AND secret_type = ?"
     )
     .bind(user_id)
     .bind(PERSONAL_TYPE)
@@ -225,7 +245,7 @@ pub async fn get_team_secrets(login: String, pool: &SqlitePool) -> Result<Vec<Ta
     .await?;
 
     let all_secrets: Vec<TableBlobs> = sqlx::query_as::<_, TableBlobs>(
-        "SELECT * FROM blobs WHERE id_owner = ? AND secret_type = ?"
+        "SELECT * FROM blobs WHERE owner_id = ? AND secret_type = ?"
     )
     .bind(team_id)
     .bind(TEAM_TYPE)
